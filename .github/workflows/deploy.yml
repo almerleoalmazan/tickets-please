@@ -1,0 +1,36 @@
+name: Deploy Laravel to Contabo
+
+on:
+  push:
+    branches:
+      - main   # or master, adjust to your main branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Sync project files to server
+        run: |
+          rsync -avz --exclude ".git*" --exclude "node_modules" ./ ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}
+
+      - name: Run Laravel deployment commands
+        run: |
+          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
+          cd ${{ secrets.DEPLOY_PATH }}
+          composer install --no-dev --optimize-autoloader
+          php artisan migrate --force
+          php artisan config:clear
+          php artisan route:clear
+          php artisan cache:clear
+          php artisan view:clear
+          php artisan config:cache
+          EOF
